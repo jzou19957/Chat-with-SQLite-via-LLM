@@ -37,10 +37,9 @@ Open the script file.
 Locate the line where user_query is defined. It will look like this:
 
 # Hardcoded user query
-user_query = "find a way to visualize those high short volume stock and put their name on top of it and show all the symbols depending on their short vol size put in different y axis etc"
-Replace the query string with your desired question or visualization. For example:
-# Modify the user query as needed
-user_query = "Show a trend analysis of stock prices over time with annotations for significant price changes."
+        user_query = "Show a bar chart of QQQ short volume along with the top five stock with the most similar short volume size"
+
+
 5. Prepare Your SQLite File
 Use the provided sample FINRA short volume SQLite file for testing, or replace it with any SQLite file of your choice. Save the file in the same directory as the script.
 
@@ -52,9 +51,7 @@ Review the generated output and visualizations.
 
 
 ```
-![05359ccf52ac2baffb69e50d90e84db](https://github.com/user-attachments/assets/f701ae95-f787-44aa-9635-4a0ea79e3f7d)
-
-![7c2318351594cd5f7b8dd8fd33ebdc9](https://github.com/user-attachments/assets/209291e0-971d-4ac7-8070-f74200798866)
+![9c4efb45f744bbf92485ce3acc79698](https://github.com/user-attachments/assets/5b971296-8ad2-4852-aa4a-ff44815ee630)
 
 
 ### Acknowledgements
