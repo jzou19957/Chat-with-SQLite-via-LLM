@@ -49,16 +49,27 @@ Example Usage
 Run the script with your SQLite file.
 Input your query when prompted.
 Review the generated output and visualizations.
-License
-This project is licensed under the MIT License. See the LICENSE file for details.
+
 
 ```
 ![05359ccf52ac2baffb69e50d90e84db](https://github.com/user-attachments/assets/f701ae95-f787-44aa-9635-4a0ea79e3f7d)
 
 ![7c2318351594cd5f7b8dd8fd33ebdc9](https://github.com/user-attachments/assets/209291e0-971d-4ac7-8070-f74200798866)
 ```
-Acknowledgements
-Google Gemini API for providing the generative language model.
-pandas and numpy libraries for data manipulation.
-API Usage Limits
+### Acknowledgements
+
+- **Google Gemini API:** For providing the generative language model.
+- **pandas and numpy libraries:** For data manipulation.
+
+### API Usage Limits
+
 As of August 2024, Google Gemini offers up to 1.5 billion free API tokens per day.
+
+### License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
+
+### Inspiration
+
+This code was inspired by the data analysis agent code of Hugging Face’s [Aymeric Roucher](https://huggingface.co/spaces/m-ric/agent-data-analyst) and Google’s [Dipanjan S.](https://huggingface.co/learn/cookbook/agent_text_to_sql). Major thanks for sharing knowledge about this subject through their code.
+
