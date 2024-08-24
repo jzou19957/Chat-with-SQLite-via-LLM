@@ -1,5 +1,5 @@
 # Chat-with-SQLite-via-LLM
-        This script leverages the Gemini LLM to interact directly with SQLite files (.db) by generating either an SQLite query or an automated Python script to retrieve results. These results can range from simple calculations to complex visualizations. For example, using a sample SQLite file containing FINRA short volume data for 2024-08-23, the script can answer a query to find and visualize the top ten most shorted stocks. The LLM efficiently utilizes the SQLite dataset and automatically generates Python code to produce the final result—all with a single click.
+This script leverages the Gemini LLM to interact directly with SQLite files (.db) by generating either an SQLite query or an automated Python script to retrieve results. These results can range from simple calculations to complex visualizations. For example, using a sample SQLite file containing FINRA short volume data for 2024-08-23, the script can answer a query to find and visualize the top ten most shorted stocks. The LLM efficiently utilizes the SQLite dataset and automatically generates Python code to produce the final result—all with a single click.
 
         To use this script with any SQLite file, follow these steps:
           1. Obtain a free API key from Google Gemini: Get API Key.
