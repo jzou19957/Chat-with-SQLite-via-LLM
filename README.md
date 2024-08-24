@@ -44,6 +44,8 @@ Locate the line where user_query is defined. It will look like this:
         Example: user_query = "I would like a heatmap that visualizes the top 20 most shorted stocks using a gradient color scheme in green. Ensure each stock is labeled with its name, and include a proper legend to indicate the short volume size. The gradient should range from dark green for the most shorted stocks to light green for the least shorted ones."
 ![top_20_shorted_stocks_heatmap](https://github.com/user-attachments/assets/58b1fbba-6cf6-4acb-a2bd-3583f7a4f2a5)
 
+        Example: user_query = "Find out the short volume of AAPL, MSFT, GOOGL, META, NVDA, AMZN for me and find a way to compare that to QQQ and find a way to visualize the result creatively"
+![short_volume_comparison](https://github.com/user-attachments/assets/804658c2-5066-4a0d-bb4f-4ba02c306f86)
 
 
 ### 5. Prepare Your SQLite File
