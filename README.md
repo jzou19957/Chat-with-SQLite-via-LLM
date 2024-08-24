@@ -28,7 +28,7 @@ Install the necessary Python packages by running:
 
 ```sh
 pip install pandas numpy google-generativeai
-
+```
 ![05359ccf52ac2baffb69e50d90e84db](https://github.com/user-attachments/assets/d13630ca-d890-4835-89c6-0f317da77fca)
 ![7c2318351594cd5f7b8dd8fd33ebdc9](https://github.com/user-attachments/assets/738680fa-9ce3-4356-a50c-9aa60140b708)
 
