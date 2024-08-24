@@ -37,8 +37,10 @@ Open the script file.
 Locate the line where user_query is defined. It will look like this:
 ```
 # Hardcoded user query
+```
         Example: user_query = "Show a bar chart of QQQ short volume along with the top five stock with the most similar short volume size"
 ![9c4efb45f744bbf92485ce3acc79698](https://github.com/user-attachments/assets/5b971296-8ad2-4852-aa4a-ff44815ee630)
+```
         Example: user_query = "I would like a heatmap that visualizes the top 20 most shorted stocks using a gradient color scheme in green. Ensure each stock is labeled with its name, and include a proper legend to indicate the short volume size. The gradient should range from dark green for the most shorted stocks to light green for the least shorted ones."
 ![top_20_shorted_stocks_heatmap](https://github.com/user-attachments/assets/58b1fbba-6cf6-4acb-a2bd-3583f7a4f2a5)
 ```
