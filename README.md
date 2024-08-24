@@ -45,8 +45,8 @@ Locate the line where user_query is defined. It will look like this:
 ![top_20_shorted_stocks_heatmap](https://github.com/user-attachments/assets/58b1fbba-6cf6-4acb-a2bd-3583f7a4f2a5)
 
 
-```
-5. Prepare Your SQLite File
+
+### 5. Prepare Your SQLite File
 Use the provided sample FINRA short volume SQLite file for testing, or replace it with any SQLite file of your choice. Save the file in the same directory as the script.
 
 
