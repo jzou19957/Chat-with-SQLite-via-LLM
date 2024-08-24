@@ -28,7 +28,8 @@ Install the necessary Python packages by running:
 
 ```sh
 pip install pandas numpy google-generativeai
-4. Modify the User Query
+```
+### 4. Modify the User Query
 To ask a different question about the SQLite file or request different visualizations:
 
 Open the script file.
@@ -39,13 +40,11 @@ python
 Copy code
 # Hardcoded user query
 user_query = "find a way to visualize those high short volume stock and put their name on top of it and show all the symbols depending on their short vol size put in different y axis etc"
-Replace the query string with your desired question about the SQLite file or the specific visualization you want. For example:
-
-python
-Copy code
+# Replace the query string with your desired question about the SQLite file or the specific visualization you want. For example:
 # Modify the user query as needed
 user_query = "Show a trend analysis of stock prices over time with annotations for significant price changes."
-5. Prepare Your SQLite File
+
+### 5. Prepare Your SQLite File
 Use the sample FINRA short volume SQLite file for testing or replace it with any SQLite file of your choice. Save the file in the same directory as the script.
 
 API Usage Limits
