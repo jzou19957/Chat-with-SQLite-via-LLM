@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Configure Google Gemini API
-API_KEY = "" #Replace this with your own free Gemni API
+API_KEY = "AIXXX"  # Replace with your actual API key
 generativeai.configure(api_key=API_KEY)
 model = generativeai.GenerativeModel('gemini-1.5-flash')
 
@@ -40,35 +40,43 @@ def call_generative_api(prompt: str) -> str:
         print_and_log(f"Error calling Generative API: {str(exception)}")
         return None
 
-def extract_code_block(llm_response: str) -> str:
-    """Extracts the code block from the LLM response."""
-    code_match = re.search(r"# BEGIN CODE(.*?)# END CODE", llm_response, re.DOTALL)
-    if code_match:
-        return code_match.group(1).strip()
-    else:
-        raise ValueError("No valid code block found in the LLM response.")
+def extract_code_blocks(llm_response: str) -> List[str]:
+    """Extracts multiple code blocks from the LLM response."""
+    code_blocks = re.findall(r"#begin(.*?)#end", llm_response, re.DOTALL)
+    if not code_blocks:
+        raise ValueError("No valid code blocks found in the LLM response.")
+    return [block.strip() for block in code_blocks]
 
-def execute_python_code(code: str, output_folder: str) -> str:
-    """Executes the provided Python code and returns the output."""
-    cleaned_code = extract_code_block(code)
-    code_filename = f"analysis_code_{uuid.uuid4().hex[:8]}.py"
-    
-    with open(code_filename, "w") as f:
-        f.write(cleaned_code)
+def clean_python_code(code: str) -> str:
+    """Cleans the generated Python code to ensure it is valid."""
+    # Remove any markdown-like syntax
+    code = re.sub(r'-\s*\*\*.*?\*\*\s*:', '', code)
+    return code
 
-    try:
-        result = subprocess.run([sys.executable, code_filename], capture_output=True, text=True, check=True)
-        output_path = os.path.join(output_folder, f"{code_filename.replace('.py', '_output.txt')}")
-        with open(output_path, "w") as output_file:
-            output_file.write(result.stdout)
-        print_and_log(f"Python code executed successfully. Output saved to {output_path}")
-        return result.stdout
-    except subprocess.CalledProcessError as e:
-        error_message = f"Error executing Python code: {e.stderr}\n{traceback.format_exc()}"
-        print_and_log(error_message)
-        raise RuntimeError(error_message)
-    finally:
-        os.remove(code_filename)  # Clean up generated script file
+def execute_python_code(code_blocks: List[str], output_folder: str) -> str:
+    """Executes the provided Python code blocks sequentially and returns the output."""
+    output_str = ""
+    for idx, code in enumerate(code_blocks):
+        cleaned_code = clean_python_code(code)
+        code_filename = f"analysis_code_{uuid.uuid4().hex[:8]}.py"
+        
+        with open(code_filename, "w") as f:
+            f.write(cleaned_code)
+
+        try:
+            result = subprocess.run([sys.executable, code_filename], capture_output=True, text=True, check=True)
+            output_path = os.path.join(output_folder, f"{code_filename.replace('.py', f'_output_{idx}.txt')}")
+            with open(output_path, "w") as output_file:
+                output_file.write(result.stdout)
+            print_and_log(f"Python code block {idx + 1} executed successfully. Output saved to {output_path}")
+            output_str += result.stdout + "\n"
+        except subprocess.CalledProcessError as e:
+            error_message = f"Error executing Python code block {idx + 1}: {e.stderr}\n{traceback.format_exc()}"
+            print_and_log(error_message)
+            raise RuntimeError(error_message)
+        finally:
+            os.remove(code_filename)  # Clean up generated script file
+    return output_str.strip()
 
 class DataAnalysisTool:
     def __init__(self):
@@ -124,7 +132,7 @@ class DataAnalysisTool:
         2. "COMPLEX_SQLITE" - If the query requires a more complex SQLite query (e.g., multiple joins, subqueries).
         3. "PYTHON_PANDAS" - If the query requires data manipulation or analysis that's better suited for Python and pandas.
         4. "PYTHON_VISUALIZATION" - If the query requires creating charts or visualizations.
-        Please respond with the code inside # BEGIN CODE and # END CODE markers.
+        Please respond with the code inside #begin and #end markers.
         """
         response = call_generative_api(prompt)
         if not response:
@@ -148,7 +156,7 @@ class DataAnalysisTool:
         6. For average calculations, use NULLIF to avoid division by zero, e.g., AVG(NULLIF(column, 0))
         7. If the question is ambiguous, provide multiple queries to address different interpretations.
         8. Include comments explaining any assumptions or decisions made in crafting the query.
-        Please respond with the code inside # BEGIN CODE and # END CODE markers.
+        Please respond with the code inside #begin and #end markers.
         """
         return call_generative_api(prompt)
 
@@ -170,8 +178,8 @@ class DataAnalysisTool:
         8. If the question is ambiguous, provide multiple analyses to address different interpretations.
         9. Include comments explaining any assumptions or decisions made in the analysis.
         10. Save all generated visualizations and data outputs to the '{self.output_folder}' directory.
-        11. Present the final output as a list of bullet points, starting each with a dash (-).
-        Please respond with the code inside # BEGIN CODE and # END CODE markers.
+    
+        Please respond with the code inside #begin and #end markers.
         """
         return call_generative_api(prompt)
 
@@ -208,10 +216,10 @@ class DataAnalysisTool:
                         print_and_log("SQLite execution failed, falling back to Python.")
                         complexity = "PYTHON_PANDAS"  # Fallback to Python
                         code = self.generate_python_code(user_query, complexity)
-                        result_str = execute_python_code(code, self.output_folder)
+                        result_str = execute_python_code(extract_code_blocks(code), self.output_folder)
                 else:
                     code = self.generate_python_code(user_query, complexity)
-                    result_str = execute_python_code(code, self.output_folder)
+                    result_str = execute_python_code(extract_code_blocks(code), self.output_folder)
 
                 interpretation = self.interpret_result(user_query, result_str, complexity)
                 output_file_path = os.path.join(self.output_folder, "interpretation.txt")
@@ -251,7 +259,7 @@ def main():
         print(f"Database structure:\n{json.dumps(data_tool.db_structure, indent=2)}")
         
         # Hardcoded user query
-        user_query = "find a way to visualize those high short volume stock and put their name on top of it and show all the symbols depending on their shrot vol size put in different y axis etc"
+        user_query = "Show a bar chart of QQQ short volume along with the top five stock with the most similar short volume size"
 
         # Analyzing the hardcoded query
         result = data_tool.analyze(user_query)
