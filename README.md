@@ -44,8 +44,6 @@ user_query = "Show a trend analysis of stock prices over time with annotations f
 5. Prepare Your SQLite File
 Use the provided sample FINRA short volume SQLite file for testing, or replace it with any SQLite file of your choice. Save the file in the same directory as the script.
 
-API Usage Limits
-As of August 2024, Google Gemini offers up to 1.5 billion free API tokens per day.
 
 Example Usage
 Run the script with your SQLite file.
@@ -54,9 +52,13 @@ Review the generated output and visualizations.
 License
 This project is licensed under the MIT License. See the LICENSE file for details.
 
-Acknowledgements
-Google Gemini API for providing the generative language model.
-pandas and numpy libraries for data manipulation.
+```
 ![05359ccf52ac2baffb69e50d90e84db](https://github.com/user-attachments/assets/f701ae95-f787-44aa-9635-4a0ea79e3f7d)
 
 ![7c2318351594cd5f7b8dd8fd33ebdc9](https://github.com/user-attachments/assets/209291e0-971d-4ac7-8070-f74200798866)
+```
+Acknowledgements
+Google Gemini API for providing the generative language model.
+pandas and numpy libraries for data manipulation.
+API Usage Limits
+As of August 2024, Google Gemini offers up to 1.5 billion free API tokens per day.
