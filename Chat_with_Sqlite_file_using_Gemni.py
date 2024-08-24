@@ -10,6 +10,7 @@ import numpy as np
 import re
 import json
 import uuid
+import importlib
 from typing import Dict, List, Any, Tuple
 import google.generativeai as generativeai
 import random
@@ -20,7 +21,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Configure Google Gemini API
-API_KEY = "AIXXX"  # Replace with your actual API key
+API_KEY = "XXXX"  # Replace with your actual API key
 generativeai.configure(api_key=API_KEY)
 model = generativeai.GenerativeModel('gemini-1.5-flash')
 
@@ -53,6 +54,25 @@ def clean_python_code(code: str) -> str:
     code = re.sub(r'-\s*\*\*.*?\*\*\s*:', '', code)
     return code
 
+def install_package(package_name: str, retries: int = 3):
+    """Installs a package using pip with retries."""
+    for attempt in range(retries):
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
+            return  # Successfully installed, exit function
+        except subprocess.CalledProcessError as e:
+            print_and_log(f"Failed to install {package_name} on attempt {attempt + 1}: {e}")
+    raise RuntimeError(f"Failed to install {package_name} after {retries} attempts.")
+
+def create_and_activate_venv():
+    """Creates and activates a new virtual environment."""
+    venv_name = f"venv_{uuid.uuid4().hex[:8]}"
+    subprocess.check_call([sys.executable, "-m", "venv", venv_name])
+    activate_script = os.path.join(venv_name, "Scripts" if os.name == 'nt' else "bin", "activate")
+    activate_cmd = f"source {activate_script}" if os.name != 'nt' else f"{activate_script}"
+    subprocess.check_call(activate_cmd, shell=True)
+    return venv_name
+
 def execute_python_code(code_blocks: List[str], output_folder: str) -> str:
     """Executes the provided Python code blocks sequentially and returns the output."""
     output_str = ""
@@ -64,6 +84,28 @@ def execute_python_code(code_blocks: List[str], output_folder: str) -> str:
             f.write(cleaned_code)
 
         try:
+            # Check and install missing packages
+            required_packages = re.findall(r"import (\w+)|from (\w+) import", cleaned_code)
+            for package in required_packages:
+                package_name = package[0] or package[1]
+                try:
+                    importlib.import_module(package_name)
+                except ImportError:
+                    try:
+                        install_package(package_name)
+                    except Exception as e:
+                        print_and_log(f"Failed to install {package_name}. Trying fallback libraries.")
+                        # Implement fallback logic here
+                        # For example, if matplotlib fails, try plotly
+                        if package_name == "matplotlib":
+                            try:
+                                install_package("plotly")
+                                cleaned_code = cleaned_code.replace("matplotlib", "plotly")
+                            except Exception as e:
+                                print_and_log(f"Fallback to plotly failed: {e}")
+                                raise
+
+            # Execute the code block
             result = subprocess.run([sys.executable, code_filename], capture_output=True, text=True, check=True)
             output_path = os.path.join(output_folder, f"{code_filename.replace('.py', f'_output_{idx}.txt')}")
             with open(output_path, "w") as output_file:
@@ -170,7 +212,7 @@ class DataAnalysisTool:
         Guidelines:
         1. The .db file is in the current working directory. Use glob to find it.
         2. Use SQLite to query the database and pandas for data manipulation.
-        3. If the analysis type is PYTHON_VISUALIZATION, create visualizations using matplotlib or seaborn.
+        3. If the analysis type is PYTHON_VISUALIZATION, create visualizations using matplotlib or seaborn or anything you see fit.
         4. Handle potential errors such as missing data or unexpected data types.
         5. Optimize for performance by only reading necessary data from the database.
         6. For calculations like averages, exclude null values and potentially invalid values (e.g., zero for age).
@@ -178,7 +220,6 @@ class DataAnalysisTool:
         8. If the question is ambiguous, provide multiple analyses to address different interpretations.
         9. Include comments explaining any assumptions or decisions made in the analysis.
         10. Save all generated visualizations and data outputs to the '{self.output_folder}' directory.
-    
         Please respond with the code inside #begin and #end markers.
         """
         return call_generative_api(prompt)
@@ -204,7 +245,7 @@ class DataAnalysisTool:
         print_and_log(f"Query complexity assessment: {complexity}")
         print_and_log(f"Explanation: {explanation}")
 
-        max_attempts = 3
+        max_attempts = 15
         for attempt in range(max_attempts):
             try:
                 if complexity in ("SIMPLE_SQLITE", "COMPLEX_SQLITE"):
@@ -230,7 +271,15 @@ class DataAnalysisTool:
             except Exception as e:
                 logger.error(f"Attempt {attempt + 1} failed: {str(e)}")
                 if attempt == max_attempts - 1:
-                    return f"Failed to execute analysis after {max_attempts} attempts. Error: {str(e)}"
+                    print_and_log("Attempting to generate alternative analysis due to failure.")
+                    alternative_code = self.generate_alternative_analysis(user_query)
+                    alternative_result_str = execute_python_code(extract_code_blocks(alternative_code), self.output_folder)
+                    interpretation = self.interpret_result(user_query, alternative_result_str, "ALTERNATIVE_ANALYSIS")
+                    output_file_path = os.path.join(self.output_folder, "alternative_interpretation.txt")
+                    with open(output_file_path, "w") as output_file:
+                        output_file.write(interpretation)
+                    print_and_log(f"Alternative interpretation saved to {output_file_path}")
+                    return interpretation
 
     def interpret_result(self, user_query: str, result: str, complexity: str) -> str:
         """Interprets the result of the analysis."""
@@ -252,15 +301,42 @@ class DataAnalysisTool:
         """
         return call_generative_api(prompt)
 
+    def generate_alternative_analysis(self, user_query: str) -> str:
+        """Generates alternative analysis or visualization based on the user's query intent."""
+        prompt = f"""
+        Generate an alternative analysis or visualization based on the user's query intent: '{user_query}'
+        Database structure: {json.dumps(self.db_structure, indent=2)}
+        Sample Data: {json.dumps(self.sample_data, indent=2)}
+        Guidelines:
+        1. The .db file is in the current working directory. Use glob to find it.
+        2. Use SQLite to query the database and pandas for data manipulation.
+        3. Create visualizations using matplotlib or seaborn or anything you see fit.
+        4. Handle potential errors such as missing data or unexpected data types.
+        5. Optimize for performance by only reading necessary data from the database.
+        6. For calculations like averages, exclude null values and potentially invalid values (e.g., zero for age).
+        7. Provide counts of total records, valid records, and records excluded due to null or invalid values.
+        8. Include comments explaining any assumptions or decisions made in the analysis.
+        9. Save all generated visualizations and data outputs to the '{self.output_folder}' directory.
+        Please respond with the code inside #begin and #end markers.
+        """
+        return call_generative_api(prompt)
+
 def main():
     try:
+        # Create and activate a new virtual environment
+        venv_name = create_and_activate_venv()
+        print_and_log(f"Created and activated virtual environment: {venv_name}")
+
+        # Update pip to the latest version
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "pip"])
+        print_and_log("Updated pip to the latest version.")
+
         data_tool = DataAnalysisTool()
         print(f"Database file: {data_tool.db_file}")
         print(f"Database structure:\n{json.dumps(data_tool.db_structure, indent=2)}")
         
         # Hardcoded user query
-        user_query = "Show a bar chart of QQQ short volume along with the top five stock with the most similar short volume size"
-
+        user_query = "Find out the short volume of AAPL, MSFT, GOOGL, META, NVDA, AMZN for me and find a way to compare that to QQQ and find a way to visualize the result creatively"
         # Analyzing the hardcoded query
         result = data_tool.analyze(user_query)
         print("\nAnalysis Result:")
@@ -269,6 +345,13 @@ def main():
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         print(f"An error occurred: {str(e)}")
+    finally:
+        # Deactivate and remove the virtual environment
+        deactivate_cmd = "deactivate" if os.name != 'nt' else ""
+        subprocess.check_call(deactivate_cmd, shell=True)
+        print_and_log(f"Deactivated virtual environment: {venv_name}")
+        subprocess.check_call(["rm", "-rf", venv_name], shell=True)
+        print_and_log(f"Removed virtual environment: {venv_name}")
 
 if __name__ == "__main__":
     main()
