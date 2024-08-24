@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Configure Google Gemini API
-API_KEY = "XXXX"  # Replace with your actual API key
+API_KEY = "XXXX"  # Replace with your own free API key at https://ai.google.dev/
 generativeai.configure(api_key=API_KEY)
 model = generativeai.GenerativeModel('gemini-1.5-flash')
 
