@@ -1,5 +1,5 @@
 # Chat-with-SQLite-via-LLM
-This script facilitates dynamic interaction with SQLite databases using a language model (LLM) from Google Gemini. 
+
 This script facilitates dynamic interaction with SQLite databases using a language model (LLM) from Google Gemini. It incorporates multiple Python libraries, such as os, glob, sqlite3, logging, subprocess, pandas, numpy, re, and others, to perform various tasks, including file handling, database querying, logging, and data manipulation.
 
 Key Components:
