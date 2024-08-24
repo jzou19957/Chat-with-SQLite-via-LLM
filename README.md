@@ -56,7 +56,7 @@ Review the generated output and visualizations.
 
 ![7c2318351594cd5f7b8dd8fd33ebdc9](https://github.com/user-attachments/assets/209291e0-971d-4ac7-8070-f74200798866)
 
-```
+
 ### Acknowledgements
 
 - **Google Gemini API:** For providing the generative language model.
@@ -74,4 +74,4 @@ This project is licensed under the [MIT License](LICENSE). See the LICENSE file 
 
 This code was inspired by the data analysis agent examples from Hugging Face’s [Aymeric Roucher](https://huggingface.co/spaces/m-ric/agent-data-analyst) and Google’s [Dipanjan S.](https://huggingface.co/learn/cookbook/agent_text_to_sql). Special thanks for sharing their expertise and code.
 
-```
+
