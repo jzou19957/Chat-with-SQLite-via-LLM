@@ -52,7 +52,7 @@ Use the provided sample FINRA short volume SQLite file for testing, or replace i
 
 Example Usage
 Run the script with your SQLite file.
-Input your query when prompted.
+Write your question in the user query section of the code
 Review the generated output and visualizations.
 
 
