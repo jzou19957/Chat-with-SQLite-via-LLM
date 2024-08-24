@@ -56,7 +56,7 @@ Input your query when prompted.
 Review the generated output and visualizations.
 
 
-```
+
 
 ### Acknowledgements
 
