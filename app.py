@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 # Load configuration
 CONFIG = {
-    "API_KEY": os.getenv("GENERATIVE_API_KEY", "######"),  # Replace with your own free API at https://ai.google.dev/
-    "HARD_WIRED_QUESTION": "I would like a heatmap that visualizes the top 20 most shorted stocks using a gradient color scheme in green. Ensure each stock is labeled with its name, and include a proper legend to indicate the short volume size. The gradient should range from dark green for the most shorted stocks to light green for the least shorted ones."
+    "API_KEY": os.getenv("GENERATIVE_API_KEY", "AIzaSy###########"),  # Replace with your own free API at https://ai.google.dev/
+
 }
 
 # Configure Google Gemini API
@@ -189,6 +189,18 @@ class DataAnalysisTool:
         conn.close()
         return sample_data
 
+    def preprocess_user_query(self, raw_query: str) -> str:
+        """Preprocesses the user's raw query using the LLM to generate a cleaned, specific, and enhanced query."""
+        prompt = f"""
+        You are tasked with preprocessing a user's raw query to make it suitable for analysis. The raw query is: '{raw_query}'
+        
+        Guidelines:
+        1. Identify and correct any typos or ambiguities in the query.
+        2. Enhance the query to be free of obvious grammar error and syntax error.
+        """
+        cleaned_query = call_generative_api(prompt)
+        return cleaned_query.strip() if cleaned_query else raw_query
+
     def assess_query_complexity(self, user_query: str) -> Tuple[str, str]:
         """Assesses the complexity of the user's query."""
         prompt = f"""
@@ -198,7 +210,7 @@ class DataAnalysisTool:
         Sample Data: {json.dumps(self.sample_data, indent=2)}
         Determine which of the following methods is most appropriate:
         1. "SIMPLE_SQLITE" - If the query can be answered with a straightforward SQLite query.
-        2. "COMPLEX_SQLITE" - If the query requires a more complex SQLite query (e.g., multiple joins, subqueries).
+        2. "COMPLEX_SQLITE" - If the query requires a more complex SQLite query (e.g., multiple joins, subqueries,complex, multi-stage calculation).
         3. "PYTHON_PANDAS" - If the query requires data manipulation or analysis that's better suited for Python and pandas.
         4. "PYTHON_VISUALIZATION" - If the query requires creating charts or visualizations.
         Please respond with the code inside #begin and #end markers.
@@ -219,6 +231,7 @@ class DataAnalysisTool:
         Guidelines:
         0. You are the world's best SQLite expert, capable of generating precise, efficient, and well-optimized queries. - Adapt the query based on the specified complexity level to meet user requirements effectively. - Ensure the query is free from common errors, optimized for performance, and formatted for clarity and readability.
         1. Use a {'simple' if complexity == 'SIMPLE_SQLITE' else 'complex'} SQLite query to answer the question.
+        2.5. Before you generate query, use common sense to see if there are errors and ambiguity in the query, fix and reformatted into good query first.
         2. Ensure the query is efficient and doesn't read unnecessary data.
         3. Format the query for readability.
         4. Include comments explaining any assumptions or decisions made in crafting the query.
@@ -260,25 +273,67 @@ class DataAnalysisTool:
         return improved_query
 
     def generate_python_code(self, user_query: str, complexity: str) -> str:
-        """Generates Python code to analyze the data."""
+        """Generates Python code to analyze the data based on a user query and complexity level."""
+        
+        # Build the code generation prompt
         initial_code_prompt = f"""
-        Generate Python code to precisely answer this question: '{user_query}'
+        Generate Python code to answer the following question: '{user_query}'
+        
         Analysis Type: {complexity}
-        Database structure: {json.dumps(self.db_structure, indent=2)}
-        Sample Data: {json.dumps(self.sample_data, indent=2)}
-        Guidelines:
-        0. You are an expert Python programmer with an IQ of 180, known for your ability to write flawless, well-organized, and efficient code in a single attempt. - You are highly skilled in data visualization and analysis, particularly with SQLite databases. - You are familiar with all best practices and renowned for producing reliable, error-free code. - Utilize appropriate Python libraries such as `sqlite3` for database interaction, `pandas` for data manipulation, and `matplotlib` or `seaborn` for data visualization. - Write code that is modular and easy to understand, with clear variable names and concise, informative comments. - Ensure the solution is optimized for performance and considers edge cases and potential input errors.
-        1. The .db file is in the current working directory. Use glob to find it.
-        2. Use SQLite to query the database and pandas for data manipulation.
-        3. If the analysis type is PYTHON_VISUALIZATION, create visualizations using matplotlib or seaborn or anything you see fit.
-        4. Handle potential errors such as missing data or unexpected data types.
-        5. Optimize for performance by only reading necessary data from the database.
-        6. For calculations like averages, exclude null values and potentially invalid values (e.g., zero for age).
-        7. Provide counts of total records, valid records, and records excluded due to null or invalid values.
-        8. Include comments explaining any assumptions or decisions made in the analysis.
-        9. Save all generated visualizations and data outputs to the '{self.output_folder}' directory.
-        Please respond with the code inside #begin and #end markers.
+        Database Structure:
+        {json.dumps(self.db_structure, indent=2)}
+        
+        Sample Data:
+        {json.dumps(self.sample_data, indent=2)}
+        
+        Guidelines for Code Generation:
+        1. You are a Python expert known for writing efficient, well-organized, and error-free code.
+        - Specialize in data visualization and analysis using SQLite databases.
+        - Utilize Python libraries like `sqlite3` (for database interaction), `pandas` (for data manipulation), 
+            and `matplotlib` or `seaborn` (for visualization).
+        - Ensure the code is modular, easy to understand, with clear variable names and informative comments.
+        - Optimize performance, handle edge cases, and anticipate input errors.
+   
+        2. The .db file is located in the current working directory. Use `glob` to locate it.
+        - Only use this .db file; do not create new ones.
+        
+        3. When the user query is vague, proactively convert it into a suitable professional visualization. Sometimes the query
+        can have very obvious mistakes which requires direct intervention (.e.g what is APPL symbol, when in fact it is a typo for "AAPL"). Always prioritize the database you have in terms of what it can help the query with. Do not create or generate anything which the database itself does not have or cannot be computed to have. Create no more than two visualization by default unless otherwise specified.
+        
+        4. For complex tasks requiring multi-step solutions:
+        - Treat the problem like a multi-step math problem, with each step building on the previous one.
+        - Generate comprehensive code that addresses all steps to reach the final solution.
+        
+        5. Default to academic-style, publication-ready statistics and visualizations.
+        - Make visualization choices proactively unless specified by the user.
+        
+        6. Use SQLite for database queries and pandas for data manipulation.
+        
+        7. If the analysis type is PYTHON_VISUALIZATION:
+        - Create visualizations using `matplotlib`, `seaborn`, or other suitable libraries.
+
+        7.5. By default generate no more than two visualization and one statistic report each time. If the generalized visualization 
+        contains no data, that means it has failed and should be scraped. 
+
+        7.6 By default do not create new .db file or csv files or any separate data files, work directly with the provided .db file only. If any new .db file is created by the code by accident, delete it so that you stick strictly with the provided .db file. 
+        
+        8. Address potential errors such as missing or unexpected data types.
+        
+        9. Optimize performance by reading only necessary data from the database.
+        
+        10. For calculations like averages:
+            - Exclude null and potentially invalid values (e.g., zero for age).
+        
+        11. Provide counts of total records, valid records, and records excluded due to null or invalid values.
+        
+        12. Include comments explaining assumptions or decisions made during the analysis.
+        
+        13. Save all generated visualizations and data outputs to the '{self.output_folder}' directory.
+        
+        Respond with the code enclosed within #begin and #end markers.
         """
+
+
         initial_code = call_generative_api(initial_code_prompt)
         if not initial_code:
             return None
@@ -327,12 +382,14 @@ class DataAnalysisTool:
 
     def analyze(self, user_query: str) -> str:
         """Analyzes the database based on the user's query."""
-        complexity, explanation = self.assess_query_complexity(user_query)
+        cleaned_query = self.preprocess_user_query(user_query)
+        complexity, explanation = self.assess_query_complexity(cleaned_query)
         print_and_log(f"Query complexity assessment: {complexity}")
         print_and_log(f"Explanation: {explanation}")
 
         analysis_metadata = {
             "user_query": user_query,
+            "cleaned_query": cleaned_query,
             "db_file": self.db_file,
             "date_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "result_description": "",
@@ -345,18 +402,18 @@ class DataAnalysisTool:
             try:
                 if complexity in ("SIMPLE_SQLITE", "COMPLEX_SQLITE"):
                     try:
-                        query = self.generate_sqlite_query(user_query, complexity)
+                        query = self.generate_sqlite_query(cleaned_query, complexity)
                         result = self.execute_sqlite_query(query)
                         result_str = result.to_string()
                         analysis_metadata["result_description"] = "SQL Query executed successfully. Results saved in CSV format."
                     except Exception:
                         print_and_log("SQLite execution failed, falling back to Python.")
                         complexity = "PYTHON_PANDAS"  # Fallback to Python
-                        code = self.generate_python_code(user_query, complexity)
+                        code = self.generate_python_code(cleaned_query, complexity)
                         result_str = execute_python_code(extract_code_blocks(code), self.output_folder)
                         analysis_metadata["result_description"] = "Python analysis executed successfully."
                 else:
-                    code = self.generate_python_code(user_query, complexity)
+                    code = self.generate_python_code(cleaned_query, complexity)
                     result_str = execute_python_code(extract_code_blocks(code), self.output_folder)
                     analysis_metadata["result_description"] = "Python visualization executed successfully."
 
@@ -368,7 +425,7 @@ class DataAnalysisTool:
                             image_path = os.path.join(self.output_folder, file)
                             analysis_metadata["visualization_base64"] = encode_image_to_base64(image_path)
 
-                interpretation = self.interpret_result(user_query, result_str, complexity)
+                interpretation = self.interpret_result(cleaned_query, result_str, complexity)
                 analysis_metadata["llm_answer"] = interpretation
 
                 output_file_path = os.path.join(self.output_folder, "analysis_results.json")
@@ -381,9 +438,9 @@ class DataAnalysisTool:
                 logger.error(f"Attempt {attempt + 1} failed: {str(e)}")
                 if attempt == max_attempts - 1:
                     print_and_log("Attempting to generate alternative analysis due to failure.")
-                    alternative_code = self.generate_alternative_analysis(user_query)
+                    alternative_code = self.generate_alternative_analysis(cleaned_query)
                     alternative_result_str = execute_python_code(extract_code_blocks(alternative_code), self.output_folder)
-                    interpretation = self.interpret_result(user_query, alternative_result_str, "ALTERNATIVE_ANALYSIS")
+                    interpretation = self.interpret_result(cleaned_query, alternative_result_str, "ALTERNATIVE_ANALYSIS")
                     analysis_metadata["llm_answer"] = interpretation
                     output_file_path = os.path.join(self.output_folder, "alternative_analysis_results.json")
                     with open(output_file_path, "w") as output_file:
@@ -464,7 +521,7 @@ def main():
         choice = int(input("Select a .db file by number: ")) - 1
         db_file = db_files[choice]
 
-        user_query = CONFIG["HARD_WIRED_QUESTION"]
+        user_query = input("Enter your query: ")
 
         data_tool = DataAnalysisTool(db_file, user_query)
         print(f"Database file: {data_tool.db_file}")
