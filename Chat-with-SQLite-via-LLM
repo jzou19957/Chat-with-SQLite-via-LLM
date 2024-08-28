@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Load configuration
 CONFIG = {
-    "API_KEY": os.getenv("GENERATIVE_API_KEY", "AIzaSyCo97kw_khjFg1x1l6yMraHE600bed3naM"),  # Replace with your own free API at https://ai.google.dev/
+    "API_KEY": os.getenv("GENERATIVE_API_KEY", "####"),  # Replace with your own free API at https://ai.google.dev/
     "HARD_WIRED_QUESTION": "I would like a heatmap that visualizes the top 20 most shorted stocks using a gradient color scheme in green. Ensure each stock is labeled with its name, and include a proper legend to indicate the short volume size. The gradient should range from dark green for the most shorted stocks to light green for the least shorted ones."
 }
 
