@@ -22,8 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Load configuration
 CONFIG = {
-    "API_KEY": os.getenv("GENERATIVE_API_KEY", "AIzaSy###########"),  # Replace with your own free API at https://ai.google.dev/
-
+    "API_KEY": os.getenv("GENERATIVE_API_KEY", "####M"),  # Replace with your own free API at https://ai.google.dev/
 }
 
 # Configure Google Gemini API
@@ -195,8 +194,7 @@ class DataAnalysisTool:
         You are tasked with preprocessing a user's raw query to make it suitable for analysis. The raw query is: '{raw_query}'
         
         Guidelines:
-        1. Identify and correct any typos or ambiguities in the query.
-        2. Enhance the query to be free of obvious grammar error and syntax error.
+        1. Identify and correct any typos in the query.
         """
         cleaned_query = call_generative_api(prompt)
         return cleaned_query.strip() if cleaned_query else raw_query
@@ -210,7 +208,7 @@ class DataAnalysisTool:
         Sample Data: {json.dumps(self.sample_data, indent=2)}
         Determine which of the following methods is most appropriate:
         1. "SIMPLE_SQLITE" - If the query can be answered with a straightforward SQLite query.
-        2. "COMPLEX_SQLITE" - If the query requires a more complex SQLite query (e.g., multiple joins, subqueries,complex, multi-stage calculation).
+        2. "COMPLEX_SQLITE" - If the query requires a more complex SQLite query (e.g., multiple joins, subqueries, complex, multi-stage calculation).
         3. "PYTHON_PANDAS" - If the query requires data manipulation or analysis that's better suited for Python and pandas.
         4. "PYTHON_VISUALIZATION" - If the query requires creating charts or visualizations.
         Please respond with the code inside #begin and #end markers.
@@ -287,6 +285,7 @@ class DataAnalysisTool:
         {json.dumps(self.sample_data, indent=2)}
         
         Guidelines for Code Generation:
+        0. Think in a step by step method, in order to answer the question, what do I need to know first? How can I know? Plan for this and then step by step gather the calculated results then write a visualization code for that. Ideally all should be done in one code, but multiple code is fine as long as you remember that any temporary notes or files you generated you have to remember what it is called so you are always fetching the right content.  
         1. You are a Python expert known for writing efficient, well-organized, and error-free code.
         - Specialize in data visualization and analysis using SQLite databases.
         - Utilize Python libraries like `sqlite3` (for database interaction), `pandas` (for data manipulation), 
@@ -302,10 +301,12 @@ class DataAnalysisTool:
         
         4. For complex tasks requiring multi-step solutions:
         - Treat the problem like a multi-step math problem, with each step building on the previous one.
+        - Figure out what you need to calculate first and what data should be processed into what before visualization attempt. Not all data are provided directly, some requires computation first before visualization.
         - Generate comprehensive code that addresses all steps to reach the final solution.
         
         5. Default to academic-style, publication-ready statistics and visualizations.
         - Make visualization choices proactively unless specified by the user.
+        - Make sure the title, legends, color, font size, text location, are all proper. 
         
         6. Use SQLite for database queries and pandas for data manipulation.
         
@@ -493,6 +494,7 @@ class DataAnalysisTool:
         2. Use SQLite to query the database and pandas for data manipulation.
         3. Create visualizations using matplotlib or seaborn or anything you see fit.
         4. Handle potential errors such as missing data or unexpected data types.
+        4. When dealing with complex tasks in which calculation is required before visualization, always get all the data needed first and then visualize.
         5. Optimize for performance by only reading necessary data from the database.
         6. For calculations like averages, exclude null values and potentially invalid values (e.g., zero for age).
         7. Provide counts of total records, valid records, and records excluded due to null or invalid values.
