@@ -13,16 +13,22 @@ from typing import Dict, List, Any, Tuple
 from datetime import datetime
 import google.generativeai as generativeai
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(asctime)s - %(levelname)s - %(message)s',
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
                     handlers=[logging.FileHandler("data_analysis.log"), logging.StreamHandler()])
 logger = logging.getLogger(__name__)
 
+# Load configuration
+CONFIG = {
+    "API_KEY": os.getenv("GENERATIVE_API_KEY", "AIzaSyCo97kw_khjFg1x1l6yMraHE600bed3naM"),  # Replace with your own free API at https://ai.google.dev/
+    "HARD_WIRED_QUESTION": "I would like a heatmap that visualizes the top 20 most shorted stocks using a gradient color scheme in green. Ensure each stock is labeled with its name, and include a proper legend to indicate the short volume size. The gradient should range from dark green for the most shorted stocks to light green for the least shorted ones."
+}
+
 # Configure Google Gemini API
 def configure_api():
-    api_key = input("Enter your Google Gemini API key: ")
-    generativeai.configure(api_key=api_key)
+    generativeai.configure(api_key=CONFIG["API_KEY"])
     return generativeai.GenerativeModel('gemini-1.5-flash')
 
 model = configure_api()
@@ -47,12 +53,14 @@ def extract_code_blocks(llm_response: str) -> List[str]:
     """Extracts multiple code blocks from the LLM response."""
     code_blocks = re.findall(r"#begin(.*?)#end", llm_response, re.DOTALL)
     if not code_blocks:
-        raise ValueError("No valid code blocks found in the LLM response.")
+        # Fallback to a more lenient extraction method if no code blocks are found
+        code_blocks = re.findall(r"```python(.*?)```", llm_response, re.DOTALL)
+        if not code_blocks:
+            raise ValueError("No valid code blocks found in the LLM response.")
     return [block.strip() for block in code_blocks]
 
 def clean_python_code(code: str) -> str:
     """Cleans the generated Python code to ensure it is valid."""
-    # Remove any markdown-like syntax
     code = re.sub(r'-\s*\*\*.*?\*\*\s*:', '', code)
     return code
 
@@ -76,18 +84,15 @@ def try_install_alternative(libraries: List[str]) -> str:
 def reflect_and_retry(code: str, error_message: str) -> str:
     """Generates a reflection prompt based on the error and previous code, and tries again."""
     reflection_prompt = f"""
-    The following Python code was executed, but an error occurred:
-    ```
-    {code}
-    ```
-    Error Message: "{error_message}"
+    # The following Python code was executed, but an error occurred:
+    
+{code}
 
-    Please analyze this situation:
-    1. What is the error message and its cause?
-    2. Is it an easy fix? If so, provide the corrected code.
-    3. If it is not an easy fix, suggest a different library or method that can deliver an equally good result.
-    4. Generate new Python code accordingly. Use commonly available libraries and methods suitable for the task.
-    Respond with the revised Python code inside #begin and #end markers.
+    # Error Message: "{error_message}"
+
+    # Analyze the error in the context of SQLite database interactions or visualizations. Identify the cause of the error and whether it can be fixed easily. If an alternative approach is required, suggest it while maintaining continuity with the existing data files and visualizations. Any generated outputs like CSV files or images must be referenced appropriately in the revised code.
+
+    # Generate a new Python code solution using a step-by-step approach to solve the problem systematically. Ensure each step logically follows from the previous one, reuses any existing outputs effectively, and includes testing where appropriate. Respond with the revised Python code inside #begin and #end markers.
     """
     new_code_response = call_generative_api(reflection_prompt)
     return new_code_response
@@ -103,23 +108,19 @@ def execute_python_code(code_blocks: List[str], output_folder: str) -> str:
             f.write(cleaned_code)
 
         try:
-            # Check and install missing packages with alternatives
             required_packages = re.findall(r"import (\w+)|from (\w+) import", cleaned_code)
             for package in required_packages:
                 package_name = package[0] or package[1]
                 try:
                     importlib.import_module(package_name)
                 except ImportError:
-                    # If package import fails, try alternatives
                     alternatives = {
                         "matplotlib": ["plotly", "bokeh"],
                         "seaborn": ["plotly", "bokeh"],
-                        # Add other libraries and their alternatives here
                     }
                     package_to_install = try_install_alternative(alternatives.get(package_name, [package_name]))
                     cleaned_code = cleaned_code.replace(package_name, package_to_install)
 
-            # Execute the code block
             result = subprocess.run([sys.executable, code_filename], capture_output=True, text=True, check=True)
             output_path = os.path.join(output_folder, f"output_{idx}.txt")
             with open(output_path, "w") as output_file:
@@ -130,7 +131,6 @@ def execute_python_code(code_blocks: List[str], output_folder: str) -> str:
             error_message = e.stderr
             print_and_log(f"Error executing Python code block {idx + 1}: {error_message}")
             try:
-                # Reflect on the error and retry
                 new_code_response = reflect_and_retry(cleaned_code, error_message)
                 new_code_blocks = extract_code_blocks(new_code_response)
                 return execute_python_code(new_code_blocks, output_folder)
@@ -138,7 +138,7 @@ def execute_python_code(code_blocks: List[str], output_folder: str) -> str:
                 print_and_log(f"Reflection and retry failed: {reflection_exception}")
                 raise RuntimeError(f"Error after reflection and retry: {reflection_exception}")
         finally:
-            os.remove(code_filename)  # Clean up generated script file
+            os.remove(code_filename)
     return output_str.strip()
 
 def encode_image_to_base64(image_path: str) -> str:
@@ -212,28 +212,103 @@ class DataAnalysisTool:
     def generate_sqlite_query(self, user_query: str, complexity: str) -> str:
         """Generates a SQLite query based on the user's query and complexity."""
         initial_query_prompt = f"""
-        You are a top-tier AI data scientist with specialized expertise in handling SQLite .db files. You are adept at understanding complex database structures, crafting efficient SQL queries, and leveraging advanced Python libraries tailored for data analysis and visualization. Your role is to deliver precise and optimized solutions for data extraction, manipulation, and visualization while maintaining the integrity and accuracy of the database. Always prioritize using the most effective tools and methods, provide clear, well-documented code, and ensure every analysis is thorough, accurate, and actionable.
-
         Generate a SQLite query to precisely answer this question: '{user_query}'
         Query Complexity: {complexity}
         Database structure: {json.dumps(self.db_structure, indent=2)}
         Sample Data: {json.dumps(self.sample_data, indent=2)}
+        Guidelines:
+        0. You are the world's best SQLite expert, capable of generating precise, efficient, and well-optimized queries. - Adapt the query based on the specified complexity level to meet user requirements effectively. - Ensure the query is free from common errors, optimized for performance, and formatted for clarity and readability.
+        1. Use a {'simple' if complexity == 'SIMPLE_SQLITE' else 'complex'} SQLite query to answer the question.
+        2. Ensure the query is efficient and doesn't read unnecessary data.
+        3. Format the query for readability.
+        4. Include comments explaining any assumptions or decisions made in crafting the query.
+        5. Ensure the query adheres to the guidelines provided.
+        6. Handle potential errors such as missing data or unexpected data types.
+        7. Optimize for performance by only reading necessary data from the database.
+        8. Include comments explaining any assumptions or decisions made in crafting the query.
+        Please respond with the code inside #begin and #end markers.
         """
-        return call_generative_api(initial_query_prompt)
+        initial_query = call_generative_api(initial_query_prompt)
+        if not initial_query:
+            return None
+
+        feedback_prompt = f"""
+        You are an objective third-party evaluator tasked with reviewing the following SQLite query. ### Your Expertise: - You specialize in detecting errors, inefficiencies, and areas for improvement, including subtle mistakes or commonly overlooked imperfections. - You excel at providing direct, actionable, and immediately useful suggestions that can be easily applied by the programmer without causing conflicts. Please review the following SQLite query generated to answer the user's query: '{user_query}'
+        Query:
+        {initial_query}
+        Provide feedback on the following aspects:
+        1. Query efficiency and performance.
+        2. Handling of potential errors and edge cases.
+        3. Clarity and readability of the query.
+        4. Adherence to the guidelines provided.
+        5. Any other improvements or suggestions.
+        Please respond with a detailed feedback report.
+        """
+        feedback = call_generative_api(feedback_prompt)
+        if not feedback:
+            return initial_query
+
+        improved_query_prompt = f"""
+        Based on the feedback provided, please revise the initial SQLite query to address the issues and improve the query.
+        Feedback:
+        {feedback}
+        Initial Query:
+        {initial_query}
+        Please respond with the revised query inside #begin and #end markers.
+        """
+        improved_query = call_generative_api(improved_query_prompt)
+        return improved_query
 
     def generate_python_code(self, user_query: str, complexity: str) -> str:
         """Generates Python code to analyze the data."""
         initial_code_prompt = f"""
-        You are a Python specialist with deep expertise in data science tasks, including data manipulation, analysis, and visualization using libraries like NumPy, Pandas, Matplotlib, and Seaborn. You excel at writing clear, efficient, and optimized code. You have full control to install any necessary packages, modify plans, and adjust code to ensure optimal performance and accuracy. Whenever providing code examples, ensure they are enclosed within #begin and #end markers. Focus on delivering precise, high-quality solutions that are easy to understand and maintain. Prioritize data accuracy, visualization clarity, and computational efficiency in all tasks.
-        
-        All visualizations must adhere to academic and scientific standards, including appropriate titles, legends, labels, and sources. Provide a descriptive summary of the visualization's content and purpose before running the visualization code.
-        
         Generate Python code to precisely answer this question: '{user_query}'
         Analysis Type: {complexity}
         Database structure: {json.dumps(self.db_structure, indent=2)}
         Sample Data: {json.dumps(self.sample_data, indent=2)}
+        Guidelines:
+        0. You are an expert Python programmer with an IQ of 180, known for your ability to write flawless, well-organized, and efficient code in a single attempt. - You are highly skilled in data visualization and analysis, particularly with SQLite databases. - You are familiar with all best practices and renowned for producing reliable, error-free code. - Utilize appropriate Python libraries such as `sqlite3` for database interaction, `pandas` for data manipulation, and `matplotlib` or `seaborn` for data visualization. - Write code that is modular and easy to understand, with clear variable names and concise, informative comments. - Ensure the solution is optimized for performance and considers edge cases and potential input errors.
+        1. The .db file is in the current working directory. Use glob to find it.
+        2. Use SQLite to query the database and pandas for data manipulation.
+        3. If the analysis type is PYTHON_VISUALIZATION, create visualizations using matplotlib or seaborn or anything you see fit.
+        4. Handle potential errors such as missing data or unexpected data types.
+        5. Optimize for performance by only reading necessary data from the database.
+        6. For calculations like averages, exclude null values and potentially invalid values (e.g., zero for age).
+        7. Provide counts of total records, valid records, and records excluded due to null or invalid values.
+        8. Include comments explaining any assumptions or decisions made in the analysis.
+        9. Save all generated visualizations and data outputs to the '{self.output_folder}' directory.
+        Please respond with the code inside #begin and #end markers.
         """
-        return call_generative_api(initial_code_prompt)
+        initial_code = call_generative_api(initial_code_prompt)
+        if not initial_code:
+            return None
+
+        feedback_prompt = f"""
+        You are an objective third-party evaluator. Please review the following Python code generated to answer the user's query: '{user_query}'
+        Code:
+        {initial_code}
+        Provide feedback on the following aspects:
+        1. Code efficiency and performance.
+        2. Handling of potential errors and edge cases.
+        3. Clarity and readability of the code.
+        4. Adherence to the guidelines provided.
+        5. Any other improvements or suggestions.
+        Please respond with a detailed feedback report.
+        """
+        feedback = call_generative_api(feedback_prompt)
+        if not feedback:
+            return initial_code
+
+        improved_code_prompt = f"""
+        Based on the feedback provided, please revise the initial Python code to address the issues and improve the code.
+        Feedback:
+        {feedback}
+        Initial Code:
+        {initial_code}
+        Please respond with the revised code inside #begin and #end markers.
+        """
+        improved_code = call_generative_api(improved_code_prompt)
+        return improved_code
 
     def execute_sqlite_query(self, query: str) -> pd.DataFrame:
         """Executes a SQLite query and returns the result as a DataFrame."""
@@ -286,10 +361,8 @@ class DataAnalysisTool:
                     analysis_metadata["result_description"] = "Python visualization executed successfully."
 
                 if complexity == "PYTHON_VISUALIZATION":
-                    # Save visualization description for analysis
                     visualization_desc = self.describe_visualization(self.output_folder)
                     analysis_metadata["visualization_description"] = visualization_desc
-                    # Encode the visualization to Base64
                     for file in os.listdir(self.output_folder):
                         if file.endswith(('.png', '.jpg', '.jpeg', '.svg')):
                             image_path = os.path.join(self.output_folder, file)
@@ -325,10 +398,20 @@ class DataAnalysisTool:
         The analysis method used was: {complexity}
         The analysis produced this result:
         {result}
+        Please provide a comprehensive response to the user's question based on this result. Include:
+        1. A precise answer to the user's question, with context.
+        2. The number of records that were excluded due to null or invalid values, if applicable.
+        3. Any assumptions made about the data.
+        4. The total number of records considered and the number of valid records used in the calculation.
+        5. Any potential issues or limitations with the analysis.
+        6. If the question could have multiple interpretations, provide alternative answers.
+        7. Present the response as a list of concise bullet points, starting each point with a dash (-).
+        8. Ensure all numerical results are rounded to two decimal places.
+        9. Keep the response detailed but concise, focusing on the most relevant information.
         Please provide a comprehensive response to the user's question based on this result. Structure the response as follows:
-        1. **Direct Answer**: Provide a concise answer to the user's question.
-        2. **Detailed Calculation and Process**: Explain the steps, calculations, and methods used to arrive at the answer.
-        3. **Limitations and Context**: Discuss any limitations in the dataset, the context of the query, and potential caveats or considerations in the answer provided.
+        1. Start with a complete and direct response to the user's question and explain why this answers the question.
+        2. Detail associated with the answers to user's question
+        3. Optional: Anything such as limitation and calculation process.
         """
         return call_generative_api(prompt)
 
@@ -351,17 +434,16 @@ class DataAnalysisTool:
         Guidelines:
         1. The .db file is in the current working directory. Use glob to find it.
         2. Use SQLite to query the database and pandas for data manipulation.
-        3. If the analysis type is PYTHON_VISUALIZATION, create visualizations using matplotlib, seaborn, or similar libraries.
+        3. Create visualizations using matplotlib or seaborn or anything you see fit.
         4. Handle potential errors such as missing data or unexpected data types.
         5. Optimize for performance by only reading necessary data from the database.
         6. For calculations like averages, exclude null values and potentially invalid values (e.g., zero for age).
         7. Provide counts of total records, valid records, and records excluded due to null or invalid values.
-        8. If the question is ambiguous, provide multiple analyses to address different interpretations.
-        9. Include comments explaining any assumptions or decisions made in the analysis.
-        10. Save all generated visualizations and data outputs to the '{self.output_folder}' directory.
-        11. Ensure the visualization is meticulous with only the right contents and is friendly to the eyes, and academic publication ready.
-        12. Pay attention to the font size, color, placement of texts, font size, and ensure the font can display multilingual languages if applied.
-        13. Ensure maximum aesthetic, modernity, professionalism, and top-notched academic journal publication-ready quality.
+        8. Include comments explaining any assumptions or decisions made in the analysis.
+        9. Save all generated visualizations and data outputs to the '{self.output_folder}' directory.
+        10. Ensure the visualization is meticulous with only the right contents and is friendly to the eyes, and academic publication ready.
+        11. Pay attention to the font size, color, placement of texts, font size, and ensure the font can display multilingual languages if applied.
+        12. Ensure maximum aesthetic, modernity, professionalism, and top-notched academic journal publication-ready quality.
         Please respond with the code inside #begin and #end markers.
         """
         return call_generative_api(prompt)
@@ -372,27 +454,22 @@ def main():
         subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "pip"])
         print_and_log("Updated pip to the latest version.")
 
-        # List available .db files
         db_files = glob.glob("*.db")
         if not db_files:
             raise FileNotFoundError("No .db files found in the current directory.")
         
-        # Display available .db files and prompt user to select one
         print("Available .db files:")
         for idx, file in enumerate(db_files):
             print(f"{idx + 1}. {file}")
         choice = int(input("Select a .db file by number: ")) - 1
         db_file = db_files[choice]
 
-        # Prompt user for query or context
-        user_query = input("Enter the query or context for analysis: ")
+        user_query = CONFIG["HARD_WIRED_QUESTION"]
 
-        # Initialize DataAnalysisTool with user inputs
         data_tool = DataAnalysisTool(db_file, user_query)
         print(f"Database file: {data_tool.db_file}")
         print(f"Database structure:\n{json.dumps(data_tool.db_structure, indent=2)}")
         
-        # Analyzing the user-provided query
         result = data_tool.analyze(user_query)
         print("\nAnalysis Result:")
         print(result)
